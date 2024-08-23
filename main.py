@@ -40,11 +40,15 @@ class Player:
         self.name = name
         self.position = 0
         self.total_moves = 0
+        self.is_immune = False
 
     def roll_die(self):
         return random.randint(1, 6)
 
     def move(self, roll, snakes, ladders):
+        if self.is_immune:
+            self.is_immune = False
+            return
         new_position = self.position + roll
         if new_position > 100:
             new_position = 100 - (new_position - 100)
@@ -55,6 +59,9 @@ class Player:
         self.position = new_position
         self.total_moves += 1
 
+    def activate_immunity(self):
+        self.is_immune = True
+
     def __str__(self):
         return f"{self.name} is at position {self.position}"
 
@@ -64,6 +71,7 @@ class Game:
         self.players = [Player(f'Player {i + 1}') for i in range(2)]
         self.current_player_index = 0
         self.max_moves = 1000
+        self.immune_turns = 0
 
     def roll_and_move(self):
         player = self.players[self.current_player_index]
@@ -73,7 +81,15 @@ class Game:
         if player.position == 100:
             print(f"{player.name} wins!")
             return True
+        if self.immune_turns > 0:
+            self.immune_turns -= 1
         return False
+
+    def activate_immune_mode(self):
+        for player in self.players:
+            player.activate_immunity()
+        self.immune_turns = 3
+        print("Immune mode activated for all players!")
 
     def switch_player(self):
         self.current_player_index = (self.current_player_index + 1) % len(self.players)
@@ -85,6 +101,8 @@ class Game:
         while moves < self.max_moves:
             if self.roll_and_move():
                 break
+            if moves % 10 == 0:
+                self.activate_immune_mode()
             self.switch_player()
             moves += 1
         else:

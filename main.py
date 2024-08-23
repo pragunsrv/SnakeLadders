@@ -53,6 +53,10 @@ class Player:
         self.xp_to_next_level = 100
         self.bonus_points = 0
         self.inventory_limit = 5
+        self.extra_turns = 0
+        self.teleportation_uses = 0
+        self.healing_potions = 0
+        self.double_dice_uses = 0
 
     def roll_die(self):
         return random.randint(1, 6)
@@ -71,6 +75,10 @@ class Player:
         self.position = new_position
         self.total_moves += 1
         self.gain_experience(10)
+        if self.extra_turns > 0:
+            self.extra_turns -= 1
+            return True
+        return False
 
     def activate_immunity(self):
         self.is_immune = True
@@ -136,7 +144,7 @@ class Player:
         self.bonus_points += points
 
     def __str__(self):
-        return f"{self.name} is at position {self.position}, Level: {self.level}, Experience: {self.experience}, Bonus Points: {self.bonus_points}"
+        return f"{self.name} is at position {self.position}, Level: {self.level}, Experience: {self.experience}, Bonus Points: {self.bonus_points}, Extra Turns: {self.extra_turns}, Teleportation Uses: {self.teleportation_uses}, Healing Potions: {self.healing_potions}, Double Dice Uses: {self.double_dice_uses}"
 
 class Ability:
     def __init__(self, name, effect, cooldown):
@@ -160,7 +168,7 @@ class Item:
 class Game:
     def __init__(self):
         self.board = Board(size=10)
-        self.players = [Player(f'Player {i + 1}') for i in range(2)]
+        self.players = [Player(f'Player {i + 1}') for i in range(4)]
         self.current_player_index = 0
         self.max_moves = 1000
         self.immune_turns = 0
@@ -168,51 +176,54 @@ class Game:
         self.special_abilities_used = {}
         self.history = []
         self.items = [
-            Item("Healing Potion", lambda p: p.add_status_effect(lambda p: print(f"{p.name} healed"), 1)),
-            Item("Double Dice", lambda p: p.roll_die()),
+            Item("Healing Potion", lambda p: p.healing_potions += 1),
+            Item("Double Dice", lambda p: p.double_dice_uses += 1),
             Item("Shield", lambda p: p.activate_immunity()),
             Item("Speed Boots", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders)),
-            Item("Teleportation Device", lambda p: p.position = random.randint(1, 100)),
+            Item("Teleportation Device", lambda p: p.teleportation_uses += 1),
             Item("Extra Life", lambda p: p.add_bonus_points(50)),
             Item("Magic Wand", lambda p: p.gain_experience(25)),
             Item("Invisibility Cloak", lambda p: p.activate_immunity()),
             Item("Energy Drink", lambda p: p.move(p.roll_die() * 2, self.board.snakes, self.board.ladders)),
             Item("Mystery Box", lambda p: p.gain_experience(random.randint(10, 50))),
             Item("Coin Purse", lambda p: p.add_bonus_points(random.randint(10, 30))),
-            Item("Teleportation Stone", lambda p: p.position = random.choice([10, 30, 50, 70, 90])),
+            Item("Teleportation Stone", lambda p: p.teleportation_uses += 1),
             Item("Regeneration Potion", lambda p: p.add_status_effect(lambda p: print(f"{p.name} regenerating"), 2)),
             Item("Luck Charm", lambda p: p.roll_die() * 2),
             Item("Victory Medal", lambda p: p.add_bonus_points(100)),
-            Item("Power-Up", lambda p: p.move(p.roll_die() * 2, self.board.snakes, self.board.ladders))
+            Item("Power-Up", lambda p: p.move(p.roll_die() * 2, self.board.snakes, self.board.ladders)),
+            Item("Time Stopper", lambda p: p.extra_turns += 1),
+            Item("Mana Potion", lambda p: p.special_abilities.append(Ability("Extra Turn", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders), 3))),
+            Item("Luck Potion", lambda p: p.gain_experience(random.randint(20, 50))),
+            Item("Teleportation Amulet", lambda p: p.position = random.choice([20, 40, 60, 80, 100])),
+            Item("Phoenix Feather", lambda p: p.healing_potions += 2),
+            Item("Dragon Scale", lambda p: p.add_status_effect(lambda p: print(f"{p.name} has increased defense"), 5))
         ]
 
     def roll_and_move(self):
         player = self.players[self.current_player_index]
         roll = player.roll_die()
-        player.move(roll, self.board.snakes, self.board.ladders)
-        self.history.append((player.name, player.position, roll))
-        print(f"{player.name} rolled a {roll} and moved to {player.position}")
-        player.apply_status_effects()
-        if player.position == 100:
-            print(f"{player.name} wins!")
-            return True
-        player.decrement_cooldowns()
-        if self.immune_turns > 0:
-            self.immune_turns -= 1
+        if player.move(roll, self.board.snakes, self.board.ladders):
+            print(f"{player.name} rolled a {roll} and moved to {player.position}.")
+            if player.position == 100:
+                print(f"{player.name} wins!")
+                self.history.append((player.name, player.position, roll))
+                return True
+            self.history.append((player.name, player.position, roll))
         return False
-
-    def activate_immune_mode(self):
-        for player in self.players:
-            player.activate_immunity()
-        self.immune_turns = 3
-        print("Immune mode activated for all players!")
 
     def switch_player(self):
         self.current_player_index = (self.current_player_index + 1) % len(self.players)
-        print(f"Switching to {self.players[self.current_player_index].name}")
 
-    def assign_special_abilities(self):
-        pass
+    def activate_immune_mode(self):
+        player = self.players[self.current_player_index]
+        player.activate_immunity()
+        print(f"{player.name} activated immunity mode.")
+
+    def handle_status_effects(self):
+        for player in self.players:
+            player.apply_status_effects()
+            player.decrement_cooldowns()
 
     def special_abilities_phase(self):
         for i, player in enumerate(self.players):
@@ -244,6 +255,9 @@ class Game:
         print("3. Ladders will move you up.")
         print("4. Use special abilities wisely.")
         print("5. First to reach position 100 wins.")
+        print("6. Special items may alter game dynamics.")
+        print("7. Manage inventory and use items strategically.")
+        print("8. Track status effects and cooldowns.")
 
     def setup_game(self):
         self.display_rules()
@@ -255,18 +269,30 @@ class Game:
             player.add_item(self.items[2])
             player.add_item(self.items[3])
             player.add_item(self.items[4])
-        self.players[0].equip_item("Healing Potion")
-        self.players[1].equip_item("Double Dice")
-        self.players[0].add_special_ability(Ability("Extra Turn", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders), 3), 3)
-        self.players[1].add_special_ability(Ability("Swap Position", lambda p: self.swap_positions(), 4), 4)
-        self.players[0].gain_experience(50)
-        self.players[1].gain_experience(75)
-        self.players[0].add_bonus_points(10)
-        self.players[1].add_bonus_points(20)
-        self.players[0].inventory_limit = 7
-        self.players[1].inventory_limit = 6
-        self.players[0].add_item(self.items[5])
-        self.players[1].add_item(self.items[6])
+            player.add_item(self.items[5])
+            player.add_item(self.items[6])
+            player.add_item(self.items[7])
+            player.add_item(self.items[8])
+            player.add_item(self.items[9])
+            player.add_item(self.items[10])
+            player.add_item(self.items[11])
+            player.add_item(self.items[12])
+            player.add_item(self.items[13])
+            player.add_item(self.items[14])
+            player.add_item(self.items[15])
+            player.add_item(self.items[16])
+            player.add_item(self.items[17])
+            player.add_item(self.items[18])
+            player.add_item(self.items[19])
+            player.equip_item("Healing Potion")
+            player.equip_item("Double Dice")
+            player.add_special_ability(Ability("Extra Turn", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders), 3), 3)
+            player.add_special_ability(Ability("Swap Position", lambda p: self.swap_positions(), 4), 4)
+            player.gain_experience(50)
+            player.add_bonus_points(10)
+            player.inventory_limit = 7
+            player.add_item(self.items[5])
+            player.add_item(self.items[6])
 
     def swap_positions(self):
         p1, p2 = self.players

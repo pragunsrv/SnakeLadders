@@ -52,11 +52,16 @@ class Player:
         self.experience = 0
         self.xp_to_next_level = 100
         self.bonus_points = 0
-        self.inventory_limit = 5
+        self.inventory_limit = 20
         self.extra_turns = 0
         self.teleportation_uses = 0
         self.healing_potions = 0
         self.double_dice_uses = 0
+        self.mystic_amulet_uses = 0
+        self.double_score_uses = 0
+        self.coins = 0
+        self.has_magic_wand = False
+        self.has_healing_ring = False
 
     def roll_die(self):
         return random.randint(1, 6)
@@ -144,7 +149,12 @@ class Player:
         self.bonus_points += points
 
     def __str__(self):
-        return f"{self.name} is at position {self.position}, Level: {self.level}, Experience: {self.experience}, Bonus Points: {self.bonus_points}, Extra Turns: {self.extra_turns}, Teleportation Uses: {self.teleportation_uses}, Healing Potions: {self.healing_potions}, Double Dice Uses: {self.double_dice_uses}"
+        return (f"{self.name} is at position {self.position}, Level: {self.level}, "
+                f"Experience: {self.experience}, Bonus Points: {self.bonus_points}, "
+                f"Extra Turns: {self.extra_turns}, Teleportation Uses: {self.teleportation_uses}, "
+                f"Healing Potions: {self.healing_potions}, Double Dice Uses: {self.double_dice_uses}, "
+                f"Coins: {self.coins}, Has Magic Wand: {self.has_magic_wand}, "
+                f"Has Healing Ring: {self.has_healing_ring}")
 
 class Ability:
     def __init__(self, name, effect, cooldown):
@@ -171,7 +181,6 @@ class Game:
         self.players = [Player(f'Player {i + 1}') for i in range(4)]
         self.current_player_index = 0
         self.max_moves = 1000
-        self.immune_turns = 0
         self.round = 1
         self.special_abilities_used = {}
         self.history = []
@@ -182,27 +191,23 @@ class Game:
             Item("Speed Boots", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders)),
             Item("Teleportation Device", lambda p: p.teleportation_uses += 1),
             Item("Extra Life", lambda p: p.add_bonus_points(50)),
-            Item("Magic Wand", lambda p: p.gain_experience(25)),
+            Item("Magic Wand", lambda p: p.has_magic_wand = True),
             Item("Invisibility Cloak", lambda p: p.activate_immunity()),
             Item("Energy Drink", lambda p: p.move(p.roll_die() * 2, self.board.snakes, self.board.ladders)),
             Item("Mystery Box", lambda p: p.gain_experience(random.randint(10, 50))),
-            Item("Coin Purse", lambda p: p.add_bonus_points(random.randint(10, 30))),
+            Item("Coin Purse", lambda p: p.coins += random.randint(10, 30)),
             Item("Teleportation Stone", lambda p: p.teleportation_uses += 1),
             Item("Regeneration Potion", lambda p: p.add_status_effect(lambda p: print(f"{p.name} regenerating"), 2)),
             Item("Luck Charm", lambda p: p.roll_die() * 2),
             Item("Victory Medal", lambda p: p.add_bonus_points(100)),
             Item("Power-Up", lambda p: p.move(p.roll_die() * 2, self.board.snakes, self.board.ladders)),
             Item("Time Stopper", lambda p: p.extra_turns += 1),
-            Item("Mana Potion", lambda p: p.special_abilities.append(Ability("Extra Turn", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders), 3))),
-            Item("Luck Potion", lambda p: p.gain_experience(random.randint(20, 50))),
-            Item("Teleportation Amulet", lambda p: p.position = random.choice([20, 40, 60, 80, 100])),
-            Item("Phoenix Feather", lambda p: p.healing_potions += 2),
-            Item("Dragon Scale", lambda p: p.add_status_effect(lambda p: print(f"{p.name} has increased defense"), 5)),
-            Item("Speed Boost", lambda p: p.move(p.roll_die() * 3, self.board.snakes, self.board.ladders)),
-            Item("Health Potion", lambda p: p.healing_potions += 1),
-            Item("Mystic Orb", lambda p: p.add_status_effect(lambda p: print(f"{p.name} gains bonus points"), 3)),
-            Item("Time Machine", lambda p: p.position = 1),
-            Item("Power Stone", lambda p: p.add_special_ability(Ability("Shield", lambda p: p.activate_immunity(), 2), 2))
+            Item("Mana Potion", lambda p: p.add_special_ability(Ability("Extra Turn", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders), 3), 3)),
+            Item("Wisdom Scroll", lambda p: p.add_bonus_points(20)),
+            Item("Gold Coin", lambda p: p.add_bonus_points(50)),
+            Item("Silver Key", lambda p: p.activate_immunity()),
+            Item("Ancient Relic", lambda p: p.add_special_ability(Ability("Teleport", lambda p: p.position = 1, 5), 5)),
+            Item("Mystic Crystal", lambda p: p.add_special_ability(Ability("Swap Positions", lambda p: self.swap_positions(), 4), 4))
         ]
 
     def roll_and_move(self):
@@ -271,6 +276,26 @@ class Game:
         print("14. Healing potions can restore your health.")
         print("15. Special abilities can be used strategically.")
         print("16. Items may provide additional benefits.")
+        print("17. Use luck charms for bonus dice rolls.")
+        print("18. Collect ancient relics for powerful abilities.")
+        print("19. Use gold coins for bonus points.")
+        print("20. Manage your inventory and equipped items effectively.")
+        print("21. Use mystic artifacts to influence game outcomes.")
+        print("22. Apply status effects to gain advantages over opponents.")
+        print("23. Use energy drinks for temporary boosts.")
+        print("24. Harness the power of ancient relics for special abilities.")
+        print("25. Collect and use special items to gain unique benefits.")
+        print("26. Manage your inventory efficiently to maximize benefits.")
+        print("27. Use time stoppers strategically to gain extra turns.")
+        print("28. Upgrade your abilities as you level up.")
+        print("29. Acquire additional lives and bonuses through items.")
+        print("30. Utilize all available resources to win the game.")
+
+    def swap_positions(self):
+        if len(self.players) == 2:
+            p1, p2 = self.players
+            p1.position, p2.position = p2.position, p1.position
+            print(f"Positions swapped: {p1.name} is now at {p1.position}, {p2.name} is now at {p2.position}")
 
     def setup_game(self):
         self.display_rules()
@@ -285,68 +310,8 @@ class Game:
             player.add_special_ability(Ability("Swap Position", lambda p: self.swap_positions(), 4), 4)
             player.gain_experience(50)
             player.add_bonus_points(10)
-            player.inventory_limit = 20
+            player.inventory_limit = 30
             player.add_item(self.items[5])
-            player.add_item(self.items[6])
-            player.add_item(self.items[7])
-            player.add_item(self.items[8])
-            player.add_item(self.items[9])
-            player.add_item(self.items[10])
-            player.add_item(self.items[11])
-            player.add_item(self.items[12])
-            player.add_item(self.items[13])
-            player.add_item(self.items[14])
-            player.add_item(self.items[15])
-            player.add_item(self.items[16])
-            player.add_item(self.items[17])
-            player.add_item(self.items[18])
-            player.add_item(self.items[19])
-            player.add_item(self.items[20])
-            player.add_item(self.items[21])
-            player.add_item(self.items[22])
-            player.add_item(self.items[23])
-            player.add_item(self.items[24])
-            player.add_item(self.items[25])
-            player.add_item(self.items[26])
-            player.add_item(self.items[27])
-            player.add_item(self.items[28])
-            player.add_item(self.items[29])
-            player.add_item(self.items[30])
-            player.add_item(self.items[31])
-            player.add_item(self.items[32])
-            player.add_item(self.items[33])
-            player.add_item(self.items[34])
-            player.add_item(self.items[35])
-            player.add_item(self.items[36])
-            player.add_item(self.items[37])
-            player.add_item(self.items[38])
-            player.add_item(self.items[39])
-            player.add_item(self.items[40])
-            player.add_item(self.items[41])
-            player.add_item(self.items[42])
-            player.add_item(self.items[43])
-            player.add_item(self.items[44])
-            player.add_item(self.items[45])
-            player.add_item(self.items[46])
-            player.add_item(self.items[47])
-            player.add_item(self.items[48])
-            player.add_item(self.items[49])
-            player.add_item(self.items[50])
-            player.add_item(self.items[51])
-            player.add_item(self.items[52])
-            player.add_item(self.items[53])
-            player.add_item(self.items[54])
-            player.add_item(self.items[55])
-            player.add_item(self.items[56])
-            player.add_item(self.items[57])
-            player.add_item(self.items[58])
-            player.add_item(self.items[59])
-            player.add_item(self.items[60])
-            player.add_item(self.items[61])
-            player.add_item(self.items[62])
-            player.add_item(self.items[63])
-            player.add_item(self.items[64])
-
     def swap_positions(self):
         p1, p2 = self.players
         p1.position, p2.position = p2.position, p1.position
@@ -398,6 +363,7 @@ class Game:
                     print(line.strip())
         except FileNotFoundError:
             print("No game history found.")
+
     def play(self):
         self.setup_game()
         self.board.print_snakes_and_ladders()

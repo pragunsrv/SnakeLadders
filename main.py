@@ -45,6 +45,8 @@ class Player:
         self.special_abilities = []
         self.special_ability_cooldowns = {}
         self.status_effects = []
+        self.inventory = []
+        self.equipped_items = {}
 
     def roll_die(self):
         return random.randint(1, 6)
@@ -96,6 +98,22 @@ class Player:
                 duration -= 1
         self.status_effects = [(effect, duration) for effect, duration in self.status_effects if duration > 0]
 
+    def add_item(self, item):
+        self.inventory.append(item)
+
+    def equip_item(self, item_name):
+        if item_name in self.inventory:
+            self.equipped_items[item_name] = self.inventory.remove(item_name)
+        else:
+            print(f"Item {item_name} not found in inventory.")
+
+    def use_item(self, item_name):
+        if item_name in self.equipped_items:
+            item = self.equipped_items[item_name]
+            item.use(self)
+        else:
+            print(f"Item {item_name} is not equipped.")
+
     def __str__(self):
         return f"{self.name} is at position {self.position}"
 
@@ -109,6 +127,15 @@ class Ability:
         self.effect(player)
         print(f"{player.name} used {self.name} ability.")
 
+class Item:
+    def __init__(self, name, effect):
+        self.name = name
+        self.effect = effect
+
+    def use(self, player):
+        self.effect(player)
+        print(f"{player.name} used item {self.name}.")
+
 class Game:
     def __init__(self):
         self.board = Board(size=10)
@@ -119,6 +146,8 @@ class Game:
         self.round = 1
         self.special_abilities_used = {}
         self.history = []
+        self.items = [Item("Healing Potion", lambda p: p.add_status_effect(lambda p: print(f"{p.name} healed"), 1)),
+                      Item("Double Dice", lambda p: p.roll_die())]
 
     def roll_and_move(self):
         player = self.players[self.current_player_index]
@@ -195,6 +224,18 @@ class Game:
         self.display_rules()
         self.load_history()
         self.assign_special_abilities()
+        for player in self.players:
+            player.add_item(self.items[0])
+            player.add_item(self.items[1])
+        self.players[0].equip_item("Healing Potion")
+        self.players[1].equip_item("Double Dice")
+        self.players[0].add_special_ability(Ability("Extra Turn", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders), 3), 3)
+        self.players[1].add_special_ability(Ability("Swap Position", lambda p: self.swap_positions(), 4), 4)
+
+    def swap_positions(self):
+        p1, p2 = self.players
+        p1.position, p2.position = p2.position, p1.position
+        print(f"Positions swapped: {p1.name} is now at {p1.position}, {p2.name} is now at {p2.position}")
 
     def play(self):
         self.setup_game()

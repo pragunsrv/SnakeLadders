@@ -41,6 +41,7 @@ class Player:
         self.position = 0
         self.total_moves = 0
         self.is_immune = False
+        self.special_abilities = []
 
     def roll_die(self):
         return random.randint(1, 6)
@@ -62,8 +63,27 @@ class Player:
     def activate_immunity(self):
         self.is_immune = True
 
+    def add_special_ability(self, ability):
+        self.special_abilities.append(ability)
+
+    def use_special_ability(self, index):
+        if 0 <= index < len(self.special_abilities):
+            ability = self.special_abilities[index]
+            ability.use(self)
+        else:
+            print("Invalid ability index.")
+
     def __str__(self):
         return f"{self.name} is at position {self.position}"
+
+class Ability:
+    def __init__(self, name, effect):
+        self.name = name
+        self.effect = effect
+
+    def use(self, player):
+        self.effect(player)
+        print(f"{player.name} used {self.name} ability.")
 
 class Game:
     def __init__(self):
@@ -95,10 +115,27 @@ class Game:
         self.current_player_index = (self.current_player_index + 1) % len(self.players)
         print(f"Switching to {self.players[self.current_player_index].name}")
 
+    def assign_special_abilities(self):
+        ability1 = Ability("Extra Roll", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders))
+        ability2 = Ability("Skip Turn", lambda p: print(f"{p.name} skipped their turn."))
+        self.players[0].add_special_ability(ability1)
+        self.players[1].add_special_ability(ability2)
+
+    def special_abilities_phase(self):
+        for i, player in enumerate(self.players):
+            if player.special_abilities:
+                print(f"{player.name}'s Special Abilities:")
+                for j, ability in enumerate(player.special_abilities):
+                    print(f"{j}: {ability.name}")
+                choice = int(input(f"{player.name}, choose an ability to use (number): "))
+                player.use_special_ability(choice)
+
     def play(self):
         self.board.print_snakes_and_ladders()
+        self.assign_special_abilities()
         moves = 0
         while moves < self.max_moves:
+            self.special_abilities_phase()
             if self.roll_and_move():
                 break
             if moves % 10 == 0:

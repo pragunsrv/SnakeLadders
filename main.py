@@ -1,4 +1,5 @@
 import random
+import time
 
 class Board:
     def __init__(self, size):
@@ -43,6 +44,7 @@ class Player:
         self.is_immune = False
         self.special_abilities = []
         self.special_ability_cooldowns = {}
+        self.status_effects = []
 
     def roll_die(self):
         return random.randint(1, 6)
@@ -84,6 +86,16 @@ class Player:
             if self.special_ability_cooldowns[ability] > 0:
                 self.special_ability_cooldowns[ability] -= 1
 
+    def add_status_effect(self, effect, duration):
+        self.status_effects.append((effect, duration))
+
+    def apply_status_effects(self):
+        for effect, duration in self.status_effects:
+            if duration > 0:
+                effect(self)
+                duration -= 1
+        self.status_effects = [(effect, duration) for effect, duration in self.status_effects if duration > 0]
+
     def __str__(self):
         return f"{self.name} is at position {self.position}"
 
@@ -104,12 +116,17 @@ class Game:
         self.current_player_index = 0
         self.max_moves = 1000
         self.immune_turns = 0
+        self.round = 1
+        self.special_abilities_used = {}
+        self.history = []
 
     def roll_and_move(self):
         player = self.players[self.current_player_index]
         roll = player.roll_die()
         player.move(roll, self.board.snakes, self.board.ladders)
+        self.history.append((player.name, player.position, roll))
         print(f"{player.name} rolled a {roll} and moved to {player.position}")
+        player.apply_status_effects()
         if player.position == 100:
             print(f"{player.name} wins!")
             return True
@@ -133,22 +150,6 @@ class Game:
         ability2 = Ability("Skip Turn", lambda p: print(f"{p.name} skipped their turn."), 1)
         self.players[0].add_special_ability(ability1, 2)
         self.players[1].add_special_ability(ability2, 1)
-    def activate_immune_mode(self):
-        for player in self.players:
-            player.activate_immunity()
-        self.immune_turns = 3
-        print("Immune mode activated for all players!")
-
-    def switch_player_(self):
-        self.current_player_index = (self.current_player_index + 1) % len(self.players)
-        print(f"Switching to {self.players[self.current_player_index].name}")
-
-    def assign_special_abilities_(self):
-        ability1 = Ability("Extra Roll", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders), 2)
-        ability2 = Ability("Skip Turn", lambda p: print(f"{p.name} skipped their turn."), 1)
-        self.players[0].add_special_ability(ability1, 2)
-        self.players[1].add_special_ability(ability2, 1)
-
 
     def special_abilities_phase(self):
         for i, player in enumerate(self.players):
@@ -158,21 +159,63 @@ class Game:
                     print(f"{j}: {ability.name} (Cooldown: {player.special_ability_cooldowns[ability.name]})")
                 choice = int(input(f"{player.name}, choose an ability to use (number): "))
                 player.use_special_ability(choice)
+                if player.name not in self.special_abilities_used:
+                    self.special_abilities_used[player.name] = set()
+                self.special_abilities_used[player.name].add(choice)
+
+    def handle_status_effects(self):
+        for player in self.players:
+            if player.status_effects:
+                print(f"{player.name} is affected by:")
+                for effect, duration in player.status_effects:
+                    print(f"- {effect.__name__} (Duration: {duration})")
+
+    def save_history(self):
+        with open('game_history.txt', 'w') as file:
+            for entry in self.history:
+                file.write(f"{entry[0]} moved to {entry[1]} after rolling {entry[2]}\n")
+
+    def load_history(self):
+        try:
+            with open('game_history.txt', 'r') as file:
+                for line in file:
+                    print(line.strip())
+        except FileNotFoundError:
+            print("No game history found.")
+
+    def display_rules(self):
+        print("Game Rules:")
+        print("1. Roll the die to move.")
+        print("2. Snakes will move you down.")
+        print("3. Ladders will move you up.")
+        print("4. Use special abilities wisely.")
+        print("5. First to reach position 100 wins.")
+
+    def setup_game(self):
+        self.display_rules()
+        self.load_history()
+        self.assign_special_abilities()
 
     def play(self):
+        self.setup_game()
         self.board.print_snakes_and_ladders()
-        self.assign_special_abilities()
         moves = 0
         while moves < self.max_moves:
+            print(f"Round {self.round}")
             self.special_abilities_phase()
             if self.roll_and_move():
+                self.save_history()
                 break
             if moves % 10 == 0:
                 self.activate_immune_mode()
+            self.handle_status_effects()
             self.switch_player()
             moves += 1
+            self.round += 1
+            time.sleep(1)
         else:
             print("Maximum moves reached.")
+            self.save_history()
 
 if __name__ == "__main__":
     game = Game()

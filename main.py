@@ -42,6 +42,7 @@ class Player:
         self.total_moves = 0
         self.is_immune = False
         self.special_abilities = []
+        self.special_ability_cooldowns = {}
 
     def roll_die(self):
         return random.randint(1, 6)
@@ -63,23 +64,34 @@ class Player:
     def activate_immunity(self):
         self.is_immune = True
 
-    def add_special_ability(self, ability):
+    def add_special_ability(self, ability, cooldown):
         self.special_abilities.append(ability)
+        self.special_ability_cooldowns[ability.name] = cooldown
 
     def use_special_ability(self, index):
         if 0 <= index < len(self.special_abilities):
             ability = self.special_abilities[index]
+            if self.special_ability_cooldowns[ability.name] > 0:
+                print(f"{ability.name} is on cooldown for {self.special_ability_cooldowns[ability.name]} more turns.")
+                return
             ability.use(self)
+            self.special_ability_cooldowns[ability.name] = ability.cooldown
         else:
             print("Invalid ability index.")
+
+    def decrement_cooldowns(self):
+        for ability in self.special_ability_cooldowns:
+            if self.special_ability_cooldowns[ability] > 0:
+                self.special_ability_cooldowns[ability] -= 1
 
     def __str__(self):
         return f"{self.name} is at position {self.position}"
 
 class Ability:
-    def __init__(self, name, effect):
+    def __init__(self, name, effect, cooldown):
         self.name = name
         self.effect = effect
+        self.cooldown = cooldown
 
     def use(self, player):
         self.effect(player)
@@ -101,6 +113,7 @@ class Game:
         if player.position == 100:
             print(f"{player.name} wins!")
             return True
+        player.decrement_cooldowns()
         if self.immune_turns > 0:
             self.immune_turns -= 1
         return False
@@ -116,17 +129,33 @@ class Game:
         print(f"Switching to {self.players[self.current_player_index].name}")
 
     def assign_special_abilities(self):
-        ability1 = Ability("Extra Roll", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders))
-        ability2 = Ability("Skip Turn", lambda p: print(f"{p.name} skipped their turn."))
-        self.players[0].add_special_ability(ability1)
-        self.players[1].add_special_ability(ability2)
+        ability1 = Ability("Extra Roll", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders), 2)
+        ability2 = Ability("Skip Turn", lambda p: print(f"{p.name} skipped their turn."), 1)
+        self.players[0].add_special_ability(ability1, 2)
+        self.players[1].add_special_ability(ability2, 1)
+    def activate_immune_mode(self):
+        for player in self.players:
+            player.activate_immunity()
+        self.immune_turns = 3
+        print("Immune mode activated for all players!")
+
+    def switch_player_(self):
+        self.current_player_index = (self.current_player_index + 1) % len(self.players)
+        print(f"Switching to {self.players[self.current_player_index].name}")
+
+    def assign_special_abilities_(self):
+        ability1 = Ability("Extra Roll", lambda p: p.move(p.roll_die(), self.board.snakes, self.board.ladders), 2)
+        ability2 = Ability("Skip Turn", lambda p: print(f"{p.name} skipped their turn."), 1)
+        self.players[0].add_special_ability(ability1, 2)
+        self.players[1].add_special_ability(ability2, 1)
+
 
     def special_abilities_phase(self):
         for i, player in enumerate(self.players):
             if player.special_abilities:
                 print(f"{player.name}'s Special Abilities:")
                 for j, ability in enumerate(player.special_abilities):
-                    print(f"{j}: {ability.name}")
+                    print(f"{j}: {ability.name} (Cooldown: {player.special_ability_cooldowns[ability.name]})")
                 choice = int(input(f"{player.name}, choose an ability to use (number): "))
                 player.use_special_ability(choice)
 
